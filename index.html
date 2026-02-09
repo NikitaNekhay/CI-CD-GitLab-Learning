@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple PWA</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Simple PWA App</h1>
+    </header>
+    
+    <section id="currency">
+        <h2>Currency Exchange Rates (RUB)</h2>
+        <p id="currency-data">Loading...</p>
+    </section>
+    
+    <section id="weather">
+        <h2>Weather</h2>
+        <p id="weather-data">Loading...</p>
+    </section>
+    
+    <section id="news">
+        <h2>RIA News RSS</h2>
+        <ul id="news-list"></ul>
+    </section>
+    
+    <section id="about">
+        <h2>About This Page</h2>
+        <p>This is a simple Progressive Web App (PWA) built with plain HTML, CSS, and JS. It fetches real-time data for currency rates from the Central Bank of Russia, weather based on your location (or Moscow as fallback), and news from RIA.ru RSS. It also includes a fun dots animation section. The app can be installed on your device for offline access (basic caching of static files).</p>
+    </section>
+    
+    <section id="animation">
+        <h2>Dots Animation</h2>
+        <p>Click anywhere in this section to trigger a cool dots particle animation!</p>
+        <canvas id="dots-canvas"></canvas>
+    </section>
+    
+    <script src="script.js"></script>
+</body>
+</html>
