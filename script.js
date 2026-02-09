@@ -1,10 +1,19 @@
-// Register service worker for PWA
+
+// Register service worker for PWA (only works over http/https)
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
         navigator.serviceWorker.register('sw.js')
-            .then(reg => console.log('Service Worker registered'))
-            .catch(err => console.log('Service Worker registration failed:', err));
+            .then(reg => {
+                console.log('Service Worker registered successfully', reg.scope);
+            })
+            .catch(err => {
+                console.error('Service Worker registration failed:', err);
+                // Optional: show message in UI if needed
+                // document.body.insertAdjacentHTML('beforeend', '<p style="color:red;">Note: Installable PWA features require running via http/https (not file://). Use a local server.</p>');
+            });
     });
+} else {
+    console.warn('Service Workers not supported in this browser.');
 }
 
 // Fetch currency rates
@@ -19,46 +28,93 @@ fetch('https://www.cbr-xml-daily.ru/daily_json.js')
         document.getElementById('currency-data').innerHTML = 'Error loading currency data.';
     });
 
-// Fetch weather (auto by IP, fallback to Moscow)
-fetch('https://wttr.in?format=j1')
-    .then(response => response.json())
-    .then(data => {
-        const temp = data.current_condition[0].temp_C;
-        const desc = data.current_condition[0].weatherDesc[0].value;
-        const location = data.nearest_area[0].areaName[0].value;
-        document.getElementById('weather-data').innerHTML = `Location: ${location}<br>Temperature: ${temp}°C<br>Condition: ${desc}`;
+// Fetch weather – use open-meteo.com (free, no CORS issues, no API key)
+fetch('https://api.open-meteo.com/v1/forecast?latitude=55.7558&longitude=37.6173&current=temperature_2m,weather_code,relative_humidity_2m,wind_speed_10m&timezone=Europe%2FMoscow')
+    .then(response => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.json();
     })
-    .catch(() => {
-        // Fallback to Moscow
-        fetch('https://wttr.in/Moscow?format=j1')
-            .then(response => response.json())
-            .then(data => {
-                const temp = data.current_condition[0].temp_C;
-                const desc = data.current_condition[0].weatherDesc[0].value;
-                document.getElementById('weather-data').innerHTML = `Moscow (fallback)<br>Temperature: ${temp}°C<br>Condition: ${desc}`;
-            })
-            .catch(() => {
-                document.getElementById('weather-data').innerHTML = 'Error loading weather data.';
-            });
+    .then(data => {
+        const current = data.current;
+        const temp = current.temperature_2m.toFixed(1);
+        const humidity = current.relative_humidity_2m;
+        const wind = current.wind_speed_10m.toFixed(1);
+        // Simple weather code to description (WMO codes: https://open-meteo.com/en/docs)
+        let desc = 'Unknown';
+        const code = current.weather_code;
+        if (code === 0) desc = 'Clear sky';
+        else if (code <= 3) desc = 'Mainly clear / cloudy';
+        else if (code <= 48) desc = 'Fog / rime';
+        else if (code <= 67 || code === 80 || code === 81) desc = 'Rain / showers';
+        else if (code <= 86) desc = 'Snow / sleet';
+        else if (code >= 95) desc = 'Thunderstorm';
+
+        document.getElementById('weather-data').innerHTML = 
+            `Moscow (via Open-Meteo)<br>` +
+            `Temperature: ${temp}°C<br>` +
+            `Condition: ${desc}<br>` +
+            `Humidity: ${humidity}%<br>` +
+            `Wind: ${wind} km/h`;
+    })
+    .catch(err => {
+        console.error('Weather fetch error:', err);
+        document.getElementById('weather-data').innerHTML = 'Error loading weather. (Try refreshing or check network)';
     });
 
-// Fetch RIA RSS
-fetch('https://ria.ru/export/rss2/index.xml')
-    .then(response => response.text())
-    .then(str => new DOMParser().parseFromString(str, 'text/xml'))
-    .then(data => {
-        const items = data.querySelectorAll('item');
+// Fetch DW RUSSIA RSS – using corsproxy.io (very common & simple prefix style)
+const tassUrl = 'https://rss.dw.com/rdf/rss-ru-all';
+const proxyPrefix = 'https://corsproxy.io/?';
+const fullUrl = proxyPrefix + encodeURIComponent(tassUrl);
+
+fetch(fullUrl)
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`Proxy responded with status ${response.status}`);
+        }
+        return response.text();
+    })
+    .then(str => {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(str, "text/xml");
+
+        // Better parse error check
+        if (xmlDoc.getElementsByTagName('parsererror').length > 0) {
+            const errorNode = xmlDoc.getElementsByTagName('parsererror')[0];
+            throw new Error('XML parse failed: ' + (errorNode.textContent || 'Unknown error'));
+        }
+
+        const items = xmlDoc.querySelectorAll('item');
         const list = document.getElementById('news-list');
+        list.innerHTML = '';  // clear old content
+
+        if (items.length === 0) {
+            list.innerHTML = '<li>No news items found in feed.</li>';
+            return;
+        }
+
         Array.from(items).slice(0, 5).forEach(item => {
-            const title = item.querySelector('title').textContent;
-            const link = item.querySelector('link').textContent;
+            const title = item.querySelector('title')?.textContent.trim() || 'No title';
+            const link = item.querySelector('link')?.textContent.trim() || '#';
+            const pubDate = item.querySelector('pubDate')?.textContent.trim() || '';
+            const desc = item.querySelector('description')?.textContent.trim() || '';
+
+            const dateStr = pubDate 
+                ? new Date(pubDate).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
+                : '';
+
             const li = document.createElement('li');
-            li.innerHTML = `<a href="${link}" target="_blank">${title}</a>`;
+            li.innerHTML = `
+                <a href="${link}" target="_blank" rel="noopener noreferrer" class="news-title">${title}</a>
+                ${dateStr ? `<div class="news-date">${dateStr}</div>` : ''}
+                ${desc ? `<div class="news-desc">${desc.substring(0, 140)}${desc.length > 140 ? '…' : ''}</div>` : ''}
+            `;
             list.appendChild(li);
         });
     })
-    .catch(() => {
-        document.getElementById('news-list').innerHTML = '<li>Error loading news.</li>';
+    .catch(err => {
+        console.error('DW RUSSIA RSS fetch failed:', err);
+        document.getElementById('news-list').innerHTML = 
+            '<li>Failed to load DW RUSSIA news.<br>Possible reasons: proxy limit, network issue, or RSS unavailable.<br>Refresh page or try later.</li>';
     });
 
 // Dots animation
