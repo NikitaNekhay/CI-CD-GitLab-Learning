@@ -38,8 +38,6 @@ build-app:
     # - npm ci --cache .npm --prefer-offline
     # - npm run build
     - echo "Build completed successfully"
-<<<<<<< HEAD
-=======
   artifacts:
     name: "build-${CI_COMMIT_SHORT_SHA}"
     paths:
@@ -51,7 +49,6 @@ build-app:
     - main
     - develop
     - merge_requests
->>>>>>> a370de2 (ansible added)
 
 # CI Stage 2: Run tests
 test-app:
@@ -64,16 +61,13 @@ test-app:
   dependencies:
     - build-app
   script:
-<<<<<<< HEAD
     - echo "Running application tests..."
     - test -f index.html && echo "index.html exists - OK"
-=======
     - echo "Running application tests on branch ${CI_COMMIT_REF_NAME}..."
     - test -f index.html && echo "✓ index.html exists"
     - test -f Dockerfile && echo "✓ Dockerfile exists"
     # Add actual tests here:
     # - npm test
->>>>>>> a370de2 (ansible added)
     - echo "All tests passed!"
   artifacts:
     reports:
@@ -153,7 +147,6 @@ deploy-production:
   before_script:
     - echo "Preparing Ansible deployment to production..."
   script:
-<<<<<<< HEAD
     - echo "Deploying to VM3 (Deployment Server)..."
     - ssh deploy-server "docker stop st19-spa || true"
     - ssh deploy-server "docker rm st19-spa || true"
@@ -165,7 +158,6 @@ deploy-production:
     - ssh deploy-server "docker ps | grep st19-spa"
     - echo "Deployment completed successfully!"
     - echo "Access the application at http://deploy.st19.sne.com:8080"
-=======
     - echo "Deploying to production using Ansible..."
     - cd ansible
     - |
@@ -178,7 +170,6 @@ deploy-production:
     - echo "Application available at: http://deploy.st19.sne.com:8080"
   after_script:
     - ssh deploy-server "docker ps | grep st19-spa"
->>>>>>> a370de2 (ansible added)
   only:
     - main
   when: manual
