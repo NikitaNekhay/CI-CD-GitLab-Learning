@@ -18,10 +18,6 @@ build-app:
     - echo "Building the application..."
     - ls -la
     - echo "Build completed successfully"
-  artifacts:
-    paths:
-      - .  # Save all files for next stages
-    expire_in: 1 hour
 
 # CI Stage 2: Run tests
 test-app:
@@ -32,10 +28,6 @@ test-app:
     - build-app
   script:
     - echo "Running application tests..."
-    # Add your actual test commands here
-    # For npm projects:
-    # - npm test
-    # For simple validation:
     - test -f index.html && echo "index.html exists - OK"
     - echo "All tests passed!"
 
@@ -77,23 +69,15 @@ deploy-app:
   dependencies: []
   script:
     - echo "Deploying to VM3 (Deployment Server)..."
-    
-    # Stop and remove old container if exists
     - ssh deploy-server "docker stop st19-spa || true"
     - ssh deploy-server "docker rm st19-spa || true"
-    
-    # Pull latest image
     - echo "Pulling Docker image on deployment server..."
     - ssh deploy-server "docker pull ${DOCKER_IMAGE_NAME}:latest"
-    
-    # Run new container
     - echo "Starting new container..."
     - ssh deploy-server "docker run -d --name st19-spa -p 8080:80 ${DOCKER_IMAGE_NAME}:latest"
-    
-    # Verify deployment
     - echo "Verifying deployment..."
     - ssh deploy-server "docker ps | grep st19-spa"
     - echo "Deployment completed successfully!"
-    - echo "Access the application at: http://deploy.st19.sne.com:8080"
+    - echo "Access the application at http://deploy.st19.sne.com:8080"
   only:
     - main
