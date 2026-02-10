@@ -172,7 +172,7 @@ deploy-staging:
         -e "container_port=8081" \
         -v
     - echo "Staging deployment completed!"
-    - echo "Application available at: http://deploy.st19.sne.com:8081"
+    - echo "Application available at http://deploy.st19.sne.com:8081"
   only:
     - develop
   when: on_success
