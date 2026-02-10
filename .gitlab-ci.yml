@@ -89,16 +89,16 @@ build-docker:
     - build-app
   script:
     - echo "Building Docker image for branch ${CI_COMMIT_REF_NAME}..."
-    - |
+    - >
       if [ "$CI_COMMIT_REF_NAME" = "main" ]; then
-        docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} .
-        docker build -t ${DOCKER_IMAGE_NAME}:latest .
-        docker build -t ${DOCKER_IMAGE_NAME}:production .
+        docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} .;
+        docker build -t ${DOCKER_IMAGE_NAME}:latest .;
+        docker build -t ${DOCKER_IMAGE_NAME}:production .;
       elif [ "$CI_COMMIT_REF_NAME" = "develop" ]; then
-        docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} .
-        docker build -t ${DOCKER_IMAGE_NAME}:develop .
+        docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} .;
+        docker build -t ${DOCKER_IMAGE_NAME}:develop .;
       else
-        docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} .
+        docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} .;
       fi
     - docker images | grep st19-spa
   only:
@@ -149,14 +149,9 @@ deploy-production:
   script:
     - echo "Deploying to production using Ansible..."
     - cd ansible
-    - |
-      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook \
-        -i inventory.ini \
-        deploy-playbook.yml \
-        -e "docker_image_name=${DOCKER_IMAGE_NAME}" \
-        -v
+    - ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory.ini deploy-playbook.yml -e "docker_image_name=${DOCKER_IMAGE_NAME}" -v
     - echo "Production deployment completed!"
-    - echo "Application available at: http://deploy.st19.sne.com:8080"
+    - echo "Application available at http://deploy.st19.sne.com:8080"
   after_script:
     - ssh deploy-server "docker ps | grep st19-spa"
   only:
@@ -177,17 +172,9 @@ deploy-staging:
   script:
     - echo "Deploying to staging using Ansible..."
     - cd ansible
-    - |
-      # For staging, we'll use port 8081
-      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook \
-        -i inventory.ini \
-        deploy-playbook.yml \
-        -e "docker_image_name=${DOCKER_IMAGE_NAME}" \
-        -e "container_name=st19-spa-staging" \
-        -e "container_port=8081" \
-        -v
+    - ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory.ini deploy-playbook.yml -e "docker_image_name=${DOCKER_IMAGE_NAME}" -e "container_name=st19-spa-staging" -e "container_port=8081" -v
     - echo "Staging deployment completed!"
-    - echo "Application available at: http://deploy.st19.sne.com:8081"
+    - echo "Application available at http://deploy.st19.sne.com:8081"
   only:
     - develop
   when: on_success
