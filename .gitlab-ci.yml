@@ -140,14 +140,9 @@ deploy-production:
   script:
     - echo "Deploying to production using Ansible..."
     - cd ansible
-    - |
-      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook \
-        -i inventory.ini \
-        deploy-playbook.yml \
-        -e "docker_image_name=${DOCKER_IMAGE_NAME}" \
-        -v
+    - ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory.ini deploy-playbook.yml -e "docker_image_name=${DOCKER_IMAGE_NAME}" -v
     - echo "Production deployment completed!"
-    - echo "Application available at: http://deploy.st19.sne.com:8080"
+    - echo "Application available at http://deploy.st19.sne.com:8080"
   after_script:
     - ssh deploy-server "docker ps | grep st19-spa"
   only:
