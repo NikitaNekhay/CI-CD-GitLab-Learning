@@ -8,92 +8,197 @@ stages:
 variables:
   DOCKER_IMAGE_NAME: "nikitanekhay/st19-spa"
   DOCKER_IMAGE_TAG: "${CI_COMMIT_SHORT_SHA}"
+  ANSIBLE_FORCE_COLOR: "true"
+
+# Cache configuration - reuse dependencies across jobs
+cache:
+  key: "${CI_COMMIT_REF_SLUG}"
+  paths:
+    - node_modules/
+    - .npm/
+  policy: pull-push
 
 # CI Stage 1: Build the application
 build-app:
   stage: build
   tags:
     - st19-runner
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}"
+    paths:
+      - node_modules/
+      - .npm/
+    policy: pull-push
+  before_script:
+    - echo "Starting build on branch ${CI_COMMIT_REF_NAME}"
   script:
     - echo "Building the application..."
     - ls -la
+    # If using npm (uncomment if needed):
+    # - npm ci --cache .npm --prefer-offline
+    # - npm run build
     - echo "Build completed successfully"
   artifacts:
+    name: "build-${CI_COMMIT_SHORT_SHA}"
     paths:
-      - .  # Save all files for next stages
+      - .
+      - Dockerfile
     expire_in: 1 hour
+    when: on_success
+  only:
+    - main
+    - develop
+    - merge_requests
 
 # CI Stage 2: Run tests
 test-app:
   stage: test
   tags:
     - st19-runner
+  needs:
+    - job: build-app
+      artifacts: true
   dependencies:
     - build-app
   script:
-    - echo "Running application tests..."
-    # Add your actual test commands here
-    # For npm projects:
+    - echo "Running application tests on branch ${CI_COMMIT_REF_NAME}..."
+    - test -f index.html && echo "✓ index.html exists"
+    - test -f Dockerfile && echo "✓ Dockerfile exists"
+    # Add actual tests here:
     # - npm test
-    # For simple validation:
-    - test -f index.html && echo "index.html exists - OK"
     - echo "All tests passed!"
+  artifacts:
+    reports:
+      junit: test-results.xml
+    when: always
+  only:
+    - main
+    - develop
+    - merge_requests
 
 # CI Stage 3: Build Docker image
 build-docker:
   stage: docker-build
   tags:
     - st19-runner
+  needs:
+    - job: test-app
   dependencies:
     - build-app
   script:
-    - echo "Building Docker image..."
-    - docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} .
-    - docker build -t ${DOCKER_IMAGE_NAME}:latest .
-    - echo "Docker image built successfully"
+    - echo "Building Docker image for branch ${CI_COMMIT_REF_NAME}..."
+    - |
+      if [ "$CI_COMMIT_REF_NAME" = "main" ]; then
+        docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} .
+        docker build -t ${DOCKER_IMAGE_NAME}:latest .
+        docker build -t ${DOCKER_IMAGE_NAME}:production .
+      elif [ "$CI_COMMIT_REF_NAME" = "develop" ]; then
+        docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} .
+        docker build -t ${DOCKER_IMAGE_NAME}:develop .
+      else
+        docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} .
+      fi
     - docker images | grep st19-spa
+  only:
+    - main
+    - develop
 
 # CI Stage 4: Push to Docker Hub
 push-docker:
   stage: docker-push
   tags:
     - st19-runner
-  dependencies:
-    - build-docker
+  needs:
+    - job: build-docker
+  dependencies: []
   script:
     - echo "Logging into Docker Hub..."
     - echo "$DOCKER_HUB_PASSWORD" | docker login -u "$DOCKER_HUB_USERNAME" --password-stdin
-    - echo "Pushing Docker image to Docker Hub..."
-    - docker push ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}
-    - docker push ${DOCKER_IMAGE_NAME}:latest
-    - echo "Docker image pushed successfully"
+    - echo "Pushing Docker image for branch ${CI_COMMIT_REF_NAME}..."
+    - |
+      if [ "$CI_COMMIT_REF_NAME" = "main" ]; then
+        docker push ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}
+        docker push ${DOCKER_IMAGE_NAME}:latest
+        docker push ${DOCKER_IMAGE_NAME}:production
+        echo "Pushed production tags"
+      elif [ "$CI_COMMIT_REF_NAME" = "develop" ]; then
+        docker push ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}
+        docker push ${DOCKER_IMAGE_NAME}:develop
+        echo "Pushed develop tag"
+      fi
     - docker logout
+  only:
+    - main
+    - develop
 
-# CD Stage 1: Deploy to deployment server
-deploy-app:
+# CD Stage: Deploy to Production using Ansible (main branch only)
+deploy-production:
   stage: deploy
   tags:
     - st19-runner
+  needs:
+    - job: push-docker
   dependencies: []
+  environment:
+    name: production
+    url: http://deploy.st19.sne.com:8080
+  before_script:
+    - echo "Preparing Ansible deployment to production..."
   script:
-    - echo "Deploying to VM3 (Deployment Server)..."
-    
-    # Stop and remove old container if exists
-    - ssh deploy-server "docker stop st19-spa || true"
-    - ssh deploy-server "docker rm st19-spa || true"
-    
-    # Pull latest image
-    - echo "Pulling Docker image on deployment server..."
-    - ssh deploy-server "docker pull ${DOCKER_IMAGE_NAME}:latest"
-    
-    # Run new container
-    - echo "Starting new container..."
-    - ssh deploy-server "docker run -d --name st19-spa -p 8080:80 ${DOCKER_IMAGE_NAME}:latest"
-    
-    # Verify deployment
-    - echo "Verifying deployment..."
+    - echo "Deploying to production using Ansible..."
+    - cd ansible
+    - |
+      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook \
+        -i inventory.ini \
+        deploy-playbook.yml \
+        -e "docker_image_name=${DOCKER_IMAGE_NAME}" \
+        -v
+    - echo "Production deployment completed!"
+    - echo "Application available at: http://deploy.st19.sne.com:8080"
+  after_script:
     - ssh deploy-server "docker ps | grep st19-spa"
-    - echo "Deployment completed successfully!"
-    - echo "Access the application at: http://deploy.st19.sne.com:8080"
   only:
     - main
+  when: manual
+
+# CD Stage: Deploy to Staging using Ansible (develop branch)
+deploy-staging:
+  stage: deploy
+  tags:
+    - st19-runner
+  needs:
+    - job: push-docker
+  dependencies: []
+  environment:
+    name: staging
+    url: http://deploy.st19.sne.com:8081
+  script:
+    - echo "Deploying to staging using Ansible..."
+    - cd ansible
+    - |
+      # For staging, we'll use port 8081
+      ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook \
+        -i inventory.ini \
+        deploy-playbook.yml \
+        -e "docker_image_name=${DOCKER_IMAGE_NAME}" \
+        -e "container_name=st19-spa-staging" \
+        -e "container_port=8081" \
+        -v
+    - echo "Staging deployment completed!"
+    - echo "Application available at: http://deploy.st19.sne.com:8081"
+  only:
+    - develop
+  when: on_success
+
+# Optional: Rollback job (manual trigger)
+rollback-production:
+  stage: deploy
+  tags:
+    - st19-runner
+  script:
+    - echo "Rolling back production deployment..."
+    - ssh deploy-server "docker stop st19-spa && docker rm st19-spa"
+    - ssh deploy-server "docker run -d --name st19-spa -p 8080:80 ${DOCKER_IMAGE_NAME}:production"
+  only:
+    - main
+  when: manual
