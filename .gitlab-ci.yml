@@ -191,8 +191,8 @@ deploy-staging:
     - echo "Staging deployment completed!"
     - echo "Application available at: http://deploy.st19.sne.com:8081"
   only:
-    - develop
-  when: on_success
+    - main
+  when: manual
 
 # Optional: Rollback job (manual trigger)
 rollback-production:
