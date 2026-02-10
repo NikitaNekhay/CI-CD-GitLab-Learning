@@ -149,17 +149,6 @@ deploy-production:
   before_script:
     - echo "Preparing Ansible deployment to production..."
   script:
-    - echo "Deploying to VM3 (Deployment Server)..."
-    - ssh deploy-server "docker stop st19-spa || true"
-    - ssh deploy-server "docker rm st19-spa || true"
-    - echo "Pulling Docker image on deployment server..."
-    - ssh deploy-server "docker pull ${DOCKER_IMAGE_NAME}:latest"
-    - echo "Starting new container..."
-    - ssh deploy-server "docker run -d --name st19-spa -p 8080:80 ${DOCKER_IMAGE_NAME}:latest"
-    - echo "Verifying deployment..."
-    - ssh deploy-server "docker ps | grep st19-spa"
-    - echo "Deployment completed successfully!"
-    - echo "Access the application at http://deploy.st19.sne.com:8080"
     - echo "Deploying to production using Ansible..."
     - cd ansible
     - |
@@ -169,7 +158,7 @@ deploy-production:
         -e "docker_image_name=${DOCKER_IMAGE_NAME}" \
         -v
     - echo "Production deployment completed!"
-    - echo "Application available at: http://deploy.st19.sne.com:8080"
+    - echo "Application available at http://deploy.st19.sne.com:8080"
   after_script:
     - ssh deploy-server "docker ps | grep st19-spa"
   only:
