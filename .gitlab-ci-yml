@@ -1,0 +1,9 @@
+stages:
+ - build
+ - test
+ - docker-build
+ - docker-push
+ - deploy
+
+variables:
+ DOCKER_IMAGE_NAME: "nikitanekhay/st19-spa"
