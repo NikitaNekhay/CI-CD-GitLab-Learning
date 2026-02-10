@@ -85,6 +85,8 @@ build-docker:
     - st19-runner
   needs:
     - job: test-app
+    - job: build-app      # Add this line
+      artifacts: true     # Add this line
   dependencies:
     - build-app
   script:
