@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  postfix:
+    image: boky/postfix:latest
+    container_name: gitlab-postfix
+    hostname: mail.st19.sne.com
+    environment:
+      - ALLOWED_SENDER_DOMAINS=yourdomain.com
+      - ALLOW_EMPTY_SENDER_DOMAINS=true
+    networks:
+      - gitlab-network
+    ports:
+      - "25:25"
+    restart: unless-stopped
+
+networks:
+  gitlab-network:
+    external: true
