@@ -1,5 +1,6 @@
 Run it as: python -m http.server 8000
 
+---
 
 Display real currency exchange rates (USD and EUR to RUB) using the Central Bank of Russia API (`https://www.cbr-xml-daily.ru/daily_json.js`, which is valid and available in Russia).
 
